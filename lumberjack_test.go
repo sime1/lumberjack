@@ -33,9 +33,9 @@ func TestNewFile(t *testing.T) {
 
 	dir := makeTempDir("TestNewFile", t)
 	defer os.RemoveAll(dir)
-	l := &Logger{
+	l := New(&LoggerParams{
 		Filename: logFile(dir),
-	}
+	})
 	defer l.Close()
 	b := []byte("boo!")
 	n, err := l.Write(b)
@@ -56,9 +56,9 @@ func TestOpenExisting(t *testing.T) {
 	isNil(err, t)
 	existsWithLen(filename, len(data), t)
 
-	l := &Logger{
+	l := New(&LoggerParams{
 		Filename: filename,
-	}
+	})
 	defer l.Close()
 	b := []byte("boo!")
 	n, err := l.Write(b)
@@ -77,10 +77,10 @@ func TestWriteTooLong(t *testing.T) {
 	megabyte = 1
 	dir := makeTempDir("TestWriteTooLong", t)
 	defer os.RemoveAll(dir)
-	l := &Logger{
+	l := New(&LoggerParams{
 		Filename: logFile(dir),
 		MaxSize:  5,
-	}
+	}).(*logger)
 	defer l.Close()
 	b := []byte("booooooooooooooo!")
 	n, err := l.Write(b)
@@ -98,9 +98,9 @@ func TestMakeLogDir(t *testing.T) {
 	dir = filepath.Join(os.TempDir(), dir)
 	defer os.RemoveAll(dir)
 	filename := logFile(dir)
-	l := &Logger{
+	l := New(&LoggerParams{
 		Filename: filename,
-	}
+	})
 	defer l.Close()
 	b := []byte("boo!")
 	n, err := l.Write(b)
@@ -115,7 +115,7 @@ func TestDefaultFilename(t *testing.T) {
 	dir := os.TempDir()
 	filename := filepath.Join(dir, filepath.Base(os.Args[0])+"-lumberjack.log")
 	defer os.Remove(filename)
-	l := &Logger{}
+	l := New(&LoggerParams{})
 	defer l.Close()
 	b := []byte("boo!")
 	n, err := l.Write(b)
@@ -133,10 +133,10 @@ func TestAutoRotate(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	filename := logFile(dir)
-	l := &Logger{
+	l := New(&LoggerParams{
 		Filename: filename,
 		MaxSize:  10,
-	}
+	})
 	defer l.Close()
 	b := []byte("boo!")
 	n, err := l.Write(b)
@@ -170,10 +170,10 @@ func TestFirstWriteRotate(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	filename := logFile(dir)
-	l := &Logger{
+	l := New(&LoggerParams{
 		Filename: filename,
 		MaxSize:  10,
-	}
+	})
 	defer l.Close()
 
 	start := []byte("boooooo!")
@@ -201,11 +201,11 @@ func TestMaxBackups(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	filename := logFile(dir)
-	l := &Logger{
+	l := New(&LoggerParams{
 		Filename:   filename,
 		MaxSize:    10,
 		MaxBackups: 1,
-	}
+	})
 	defer l.Close()
 	b := []byte("boo!")
 	n, err := l.Write(b)
@@ -342,11 +342,11 @@ func TestCleanupExistingBackups(t *testing.T) {
 	err = ioutil.WriteFile(filename, data, 0644)
 	isNil(err, t)
 
-	l := &Logger{
+	l := New(&LoggerParams{
 		Filename:   filename,
 		MaxSize:    10,
 		MaxBackups: 1,
-	}
+	})
 	defer l.Close()
 
 	newFakeTime()
@@ -372,11 +372,11 @@ func TestMaxAge(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	filename := logFile(dir)
-	l := &Logger{
+	l := New(&LoggerParams{
 		Filename: filename,
 		MaxSize:  10,
 		MaxAge:   1,
-	}
+	})
 	defer l.Close()
 	b := []byte("boo!")
 	n, err := l.Write(b)
@@ -462,7 +462,7 @@ func TestOldLogFiles(t *testing.T) {
 	err = ioutil.WriteFile(backup2, data, 07)
 	isNil(err, t)
 
-	l := &Logger{Filename: filename}
+	l := New(&LoggerParams{Filename: filename}).(*logger)
 	files, err := l.oldLogFiles()
 	isNil(err, t)
 	equals(2, len(files), t)
@@ -473,7 +473,7 @@ func TestOldLogFiles(t *testing.T) {
 }
 
 func TestTimeFromName(t *testing.T) {
-	l := &Logger{Filename: "/var/log/myfoo/foo.log"}
+	l := New(&LoggerParams{Filename: "/var/log/myfoo/foo.log"}).(*logger)
 	prefix, ext := l.prefixAndExt()
 	val := l.timeFromName("foo-2014-05-04T14-44-33.555.log", prefix, ext)
 	equals("2014-05-04T14-44-33.555", val, t)
@@ -495,11 +495,11 @@ func TestLocalTime(t *testing.T) {
 	dir := makeTempDir("TestLocalTime", t)
 	defer os.RemoveAll(dir)
 
-	l := &Logger{
+	l := New(&LoggerParams{
 		Filename:  logFile(dir),
 		MaxSize:   10,
 		LocalTime: true,
-	}
+	})
 	defer l.Close()
 	b := []byte("boo!")
 	n, err := l.Write(b)
@@ -522,11 +522,11 @@ func TestRotate(t *testing.T) {
 
 	filename := logFile(dir)
 
-	l := &Logger{
+	l := New(&LoggerParams{
 		Filename:   filename,
 		MaxBackups: 1,
 		MaxSize:    100, // megabytes
-	}
+	}).(*logger)
 	defer l.Close()
 	b := []byte("boo!")
 	n, err := l.Write(b)
@@ -572,6 +572,24 @@ func TestRotate(t *testing.T) {
 	existsWithLen(filename, n, t)
 }
 
+func TestLogDir(t *testing.T) {
+	dir := makeTempDir("TestLogDir", t)
+	l := New(&LoggerParams{
+		Filename: logFile(dir),
+		LogDir:   filepath.Join(dir, "saved"),
+	}).(*logger)
+	defer l.Close()
+
+	len, err := l.Write([]byte("booo"))
+	isNil(err, t)
+	newFakeTime()
+	l.Rotate()
+	len2, err := l.Write([]byte("booo"))
+	isNil(err, t)
+	existsWithLen(backupFile(l.LogDir), len, t)
+	existsWithLen(l.Filename, len2, t)
+}
+
 func TestJson(t *testing.T) {
 	data := []byte(`
 {
@@ -582,7 +600,7 @@ func TestJson(t *testing.T) {
 	"localtime": true
 }`[1:])
 
-	l := Logger{}
+	l := logger{}
 	err := json.Unmarshal(data, &l)
 	isNil(err, t)
 	equals("foo", l.Filename, t)
@@ -600,7 +618,7 @@ maxage: 10
 maxbackups: 3
 localtime: true`[1:])
 
-	l := Logger{}
+	l := LoggerParams{}
 	err := yaml.Unmarshal(data, &l)
 	isNil(err, t)
 	equals("foo", l.Filename, t)
@@ -618,7 +636,7 @@ maxage = 10
 maxbackups = 3
 localtime = true`[1:]
 
-	l := Logger{}
+	l := logger{}
 	md, err := toml.Decode(data, &l)
 	isNil(err, t)
 	equals("foo", l.Filename, t)
